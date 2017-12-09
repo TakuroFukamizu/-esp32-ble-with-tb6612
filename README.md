@@ -20,7 +20,18 @@
 
 - PROPERTY : Read, Write without response
 
-| start | stop | size | name | kind | description | 
-|-------|-----|-----|-----|-----|-----|
-| 0 | 2 | 3 | kind | char | コマンド種別 |
-| 3 | 5 | 2 | time | unsigned int16 | 実行時間(ms) |
+| start | size | name | kind | description | 
+|-------|-----|-----|-----|-----|
+| 0     |   1 | kind | unsigned int8  | コマンド種別 |
+| 1     |   2 | time | unsigned int16 | 実行時間(ms) |
+
+##### kind
+
+| value | kind           | need time param? | description      | 
+|-------|----------------|------------------|------------------|
+| 0x01  | CMD_FORWARD    | YES              | 指定した時間前進 | 
+| 0x02  | CMD_BACK       | YES              | 指定した時間後進 | 
+| 0xFF  | CMD_STOP       | NO               | 停止 | 
+| 0x11  | CMD_SPIN_TURN  | NO               | 超信地旋回で180度回転 |
+| 0x12  | CMD_TURN_LEFT  | YES              | 指定した時間左回転 | 
+| 0x13  | CMD_TURN_RIGHT | YES              | 指定した時間右回転 | 
