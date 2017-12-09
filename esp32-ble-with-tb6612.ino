@@ -1,4 +1,3 @@
-
 // ESP32 Dev Module (ESPr Developer 32)
 
 #include <BLEDevice.h>
@@ -7,6 +6,8 @@
 #include <BLE2902.h>
 
 #include <Wire.h>
+
+#include "esp_system.h"
 
 //------------------------------------------
 // TB6612 Moter Driver
@@ -28,6 +29,21 @@
 #define TB_B2    5  // moterB IN2
 #define TB_Bp   18  // moterB PWM
 #define TB_STBY  2  // STBY
+
+//Use LCDC for Servo Control
+// use first channel of 16 channels (started from zero)
+#define LEDC_CHANNEL_0     0
+// use 10 bit precission for LEDC timer
+#define LEDC_TIMER_BIT  10
+// use 50 Hz as a LEDC base frequency
+#define LEDC_BASE_FREQ     50
+#define SG90_PIN   13  // ServoPWM pin
+
+// int min = 26;  // (26/1024)*20ms ≒ 0.5 ms  (-90°)
+int min = 75;  // (26/1024)*20ms ≒ 0.5 ms  (-90°)
+int max = 123; // (123/1024)*20ms ≒ 2.4 ms (+90°)
+int n = min;
+boolean srv_flg = false;
 
 void setup_tb6612() {
   pinMode( TB_A1, OUTPUT );
@@ -94,7 +110,7 @@ void cmd_forward() {
 }
 
 void cmd_back() {
-  Serial.println("all forward");
+  Serial.println("all back");
   
   digitalWrite( TB_Ap, HIGH );
   digitalWrite( TB_A1, LOW );
@@ -113,6 +129,61 @@ void cmd_stop() {
   digitalWrite( TB_Bp, LOW );
 }
 
+void cmd_spin_turn() {
+  Serial.println("spin turn");
+  
+  digitalWrite( TB_Ap, HIGH );
+  digitalWrite( TB_A1, HIGH );
+  digitalWrite( TB_A2, LOW );
+  
+  digitalWrite( TB_Bp, HIGH );
+  digitalWrite( TB_B1, LOW );
+  digitalWrite( TB_B2, HIGH );
+}
+
+void cmd_turn_left() {
+  Serial.println("turn left");
+  
+  digitalWrite( TB_Ap, LOW );
+  digitalWrite( TB_A1, HIGH );
+  digitalWrite( TB_A2, LOW );
+  
+  digitalWrite( TB_Bp, HIGH );
+  digitalWrite( TB_B1, HIGH );
+  digitalWrite( TB_B2, LOW );
+}
+
+void cmd_turn_right() {
+  Serial.println("turn right");
+  
+  digitalWrite( TB_Ap, HIGH );
+  digitalWrite( TB_A1, HIGH );
+  digitalWrite( TB_A2, LOW );
+  
+  digitalWrite( TB_Bp, LOW );
+  digitalWrite( TB_B1, HIGH );
+  digitalWrite( TB_B2, LOW );
+}
+
+void cmd_srv_on() {
+  if(srv_flg == false){
+    srv_flg = true;
+    for(n = min; n <= max; n++){
+      ledcWrite(0, n);
+      delay(10);
+    }
+  }
+}
+
+void cmd_srv_off() {
+  if(srv_flg == true){
+    srv_flg = false;
+    for(n = max; n >= min; n--){
+      ledcWrite(0, n);
+      delay(10);
+    }
+  }
+}
 
 //------------------------------------------
 // BLE
@@ -123,12 +194,35 @@ void cmd_stop() {
 #define SERVICE_UUID         "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID  "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 
-#define CMD_FORWARD    "fwd"
-#define CMD_BACK       "bak"
-#define CMD_STOP       "stp"
-#define CMD_SPIN_TURN  "spt" //超信地旋回で180度回転
-#define CMD_TURN_LEFT  "tlf"
-#define CMD_TURN_RIGHT "trt"
+/**************
+value kind            need time param?  description
+0x01  CMD_FORWARD     YES 指定した時間前進
+0x02  CMD_BACK        YES 指定した時間後進
+0xFF  CMD_STOP        NO  停止
+0x11  CMD_SPIN_TURN   NO  超信地旋回で180度回転
+0x12  CMD_TURN_LEFT   YES 指定した時間左回転
+0x13  CMD_TURN_RIGHT  YES 指定した時間右回転
+0x21  CMD_SRV_ON      NO  クラッピーを起こす
+0x22  CMD_SRV_OFF     NO  クラッピーを倒す　
+*/
+
+#define CMD_FORWARD    0x01
+#define CMD_BACK       0x02
+#define CMD_STOP       0xFF
+#define CMD_SPIN_TURN  0x11
+#define CMD_TURN_LEFT  0x12
+#define CMD_TURN_RIGHT 0x13
+
+#define CMD_SRV_ON     0x21
+#define CMD_SRV_OFF    0x22
+
+#define TURN_TIME 0x1080
+
+uint8_t CMD_CURRENT = 0x00;
+
+uint16_t EXEC_TIME = 0;
+
+unsigned long start_time;
 
 //Characteristic
 BLECharacteristic *pCharacteristic;
@@ -139,13 +233,58 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 //      int value = pChara->getValue(); //cannot convert 'std::__cxx11::string {aka std::__cxx11::basic_string<char>}' to 'int' in initialization
 
       if (value.length() > 0) {
-        if (value == CMD_FORWARD) cmd_forward();
-        else if (value == CMD_BACK) cmd_back();
-        else if (value == CMD_STOP) cmd_stop();
-        else {
+        if ((int)value[0] == CMD_FORWARD){
+          if(CMD_CURRENT != CMD_FORWARD){
+            CMD_CURRENT = CMD_FORWARD;
+            cmd_forward();
+            start_time = millis();
+            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+          }
+        } else if ((int)value[0] == CMD_BACK){
+          if(CMD_CURRENT != CMD_BACK){
+            CMD_CURRENT = CMD_BACK;
+            cmd_back();
+            start_time = millis();
+            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+          }
+        } else if ((int)value[0] == CMD_STOP){
+          if(CMD_CURRENT != CMD_STOP){
+            CMD_CURRENT = CMD_STOP;
+            cmd_stop();
+            EXEC_TIME = 0;
+          }
+        } else if ((int)value[0] == CMD_SPIN_TURN){
+          if(CMD_CURRENT != CMD_SPIN_TURN){
+            CMD_CURRENT = CMD_SPIN_TURN;
+            cmd_spin_turn();
+            start_time = millis();
+//            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+              EXEC_TIME = TURN_TIME;
+          }
+        } else if ((int)value[0] == CMD_TURN_LEFT){
+          if(CMD_CURRENT != CMD_TURN_LEFT){
+            CMD_CURRENT = CMD_TURN_LEFT;
+            cmd_turn_left();
+            start_time = millis();
+            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+          }
+        } else if ((int)value[0] == CMD_TURN_RIGHT){
+          if(CMD_CURRENT != CMD_TURN_RIGHT){
+            CMD_CURRENT = CMD_TURN_RIGHT;
+            cmd_turn_right();
+            start_time = millis();
+            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+          }
+        } else if ((int)value[0] == CMD_SRV_ON){
+          cmd_srv_on();
+        } else if ((int)value[0] == CMD_SRV_OFF){
+          cmd_srv_off();
+        } else {
           Serial.println("*********");
           Serial.print("New value: ");
-          for (int i=0; i<value.length(); i++) Serial.print(value[i]);
+          for (int i=0; i<value.length(); i++){
+            Serial.print((int)value[i]);
+          }
           Serial.println();
           Serial.println("*********");
         }
@@ -177,19 +316,67 @@ void setup_ble() {
     Serial.println("Waiting a client connection to notify...");
 }
 
+// Timer Interrupt setting
+hw_timer_t * timer = NULL;
+
+volatile SemaphoreHandle_t timerSemaphore;
+portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
+
+void IRAM_ATTR onTimer(){
+  // Increment the counter and set the time of ISR
+  portENTER_CRITICAL_ISR(&timerMux);
+
+  /*** ここにタイマー割り込みで実行するコードを記載 ***/
+  if( EXEC_TIME > 0){
+    if(millis() > start_time + EXEC_TIME){
+       CMD_CURRENT = CMD_STOP;
+       cmd_stop();
+       EXEC_TIME = 0;
+    }
+  }
+
+  portEXIT_CRITICAL_ISR(&timerMux);
+  // Give a semaphore that we can check in the loop
+  xSemaphoreGiveFromISR(timerSemaphore, NULL);
+  // It is safe to use digitalRead/Write here if you want to toggle an output
+}
 
 //------------------------------------------
 // Main logics
 //------------------------------------------
 
-void setup() {
+void setup() { 
     Serial.begin(115200);
 
     setup_tb6612();
     cmd_stop();
     
     setup_ble();
+
+    // Setup timer and attach timer to a led pin
+    ledcSetup(LEDC_CHANNEL_0, LEDC_BASE_FREQ, LEDC_TIMER_BIT);
+    ledcAttachPin(SG90_PIN, LEDC_CHANNEL_0);
+
+    ledcWrite(0, n);
+
+    // Create semaphore to inform us   when the timer has fired
+    timerSemaphore = xSemaphoreCreateBinary();
+    // Use 1st timer of 4 (counted from zero).
+    // Set 80 divider for prescaler (see ESP32 Technical Reference Manual for more info).
+    timer = timerBegin(0, 80, true);
+    // Attach onTimer function to our timer.
+    timerAttachInterrupt(timer, &onTimer, true);
+    // Set alarm to call onTimer function every second (value in microseconds).
+    // Repeat the alarm (third parameter)
+    timerAlarmWrite(timer, 1000, true);
+    // Start an alarm
+    timerAlarmEnable(timer);
 }
 
 void loop() {
+//  Serial.println(n);
+//  ledcWrite(0, n);
+//  n+=5;
+//  if (n > max) n = min;
+//  delay(500);
 }
