@@ -37,3 +37,6 @@
 | 0x11  | CMD_SPIN_TURN  | NO               | 超信地旋回で180度回転 |
 | 0x12  | CMD_TURN_LEFT  | YES              | 指定した時間左回転 | 
 | 0x13  | CMD_TURN_RIGHT | YES              | 指定した時間右回転 | 
+| 0x21  | CMD_SRV_ON     | NO               | クラッピーを起こす | 
+| 0x22  | CMD_SRV_OFF    | NO               | クラッピーを倒す　 | 
+
