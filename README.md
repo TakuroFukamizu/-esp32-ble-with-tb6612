@@ -25,6 +25,8 @@
 | 0     |   1 | kind | unsigned int8  | コマンド種別 |
 | 1     |   2 | time | unsigned int16 | 実行時間(ms) |
 
+**※ time のバイトオーダーは Little Endian**
+
 ##### kind
 
 | value | kind           | need time param? | description      | 
