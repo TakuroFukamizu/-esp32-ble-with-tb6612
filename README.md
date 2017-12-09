@@ -18,7 +18,9 @@
 
 #### CHARACTERISTIC 1
 
+- PROPERTY : Read, Write without response
+
 | start | stop | size | name | kind | description | 
-|-----|-----|
+|-------|-----|-----|-----|-----|-----|
 | 0 | 2 | 3 | kind | char | コマンド種別 |
 | 3 | 5 | 2 | time | unsigned int16 | 実行時間(ms) |

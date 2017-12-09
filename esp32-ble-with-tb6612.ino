@@ -119,40 +119,19 @@ void cmd_stop() {
 //------------------------------------------
 
 #define TXRX_BUF_LEN 5
-#define DEVICE_NAME  "MyESP32"
+#define DEVICE_NAME  "YHD2017W-CP-ONI"
 #define SERVICE_UUID         "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID  "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
-#define CHARACTERISTIC2_UUID "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-#define CMD_FORWARD "f" //0x66
-#define CMD_BACK    "b" //0x62
-#define CMD_STOP    "s" //0x73
+#define CMD_FORWARD    "fwd"
+#define CMD_BACK       "bak"
+#define CMD_STOP       "stp"
+#define CMD_SPIN_TURN  "spt" //超信地旋回で180度回転
+#define CMD_TURN_LEFT  "tlf"
+#define CMD_TURN_RIGHT "trt"
 
 //Characteristic
 BLECharacteristic *pCharacteristic;
-BLECharacteristic *pCharacteristic2;
-
-//Data
-uint8_t tx_buf[TXRX_BUF_LEN];
-
-//Timer
-volatile SemaphoreHandle_t timerSemaphore;
-
-void IRAM_ATTR onTimer(){
-    //print
-    Serial.print("Send:");
-    for(int i=0;i<TXRX_BUF_LEN;i++){
-        tx_buf[i] += 1;
-        Serial.print(tx_buf[i]);Serial.print(",");
-    }
-    Serial.println();
-
-    //update notify
-    pCharacteristic->setValue(tx_buf, TXRX_BUF_LEN); //send hex
-    pCharacteristic->notify();
-
-    xSemaphoreGiveFromISR(timerSemaphore, NULL);
-}
 
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pChara) {
@@ -184,16 +163,11 @@ void setup_ble() {
     // Characteristicの定義
     pCharacteristic = pService->createCharacteristic(
                         CHARACTERISTIC_UUID,
-                        BLECharacteristic::PROPERTY_NOTIFY
-                        );
-    pCharacteristic->addDescriptor(new BLE2902());
-    pCharacteristic2 = pService->createCharacteristic(
-                        CHARACTERISTIC2_UUID,
                         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
                         );
-    pCharacteristic2->addDescriptor(new BLE2902());
-    pCharacteristic2->setCallbacks(new MyCallbacks());
-    pCharacteristic2->setValue("off");
+    pCharacteristic->addDescriptor(new BLE2902());
+    pCharacteristic->setCallbacks(new MyCallbacks());
+    pCharacteristic->setValue("off");
 
     // Start
     pService->start();
@@ -215,18 +189,6 @@ void setup() {
     cmd_stop();
     
     setup_ble();
-
-//    //Timer
-//    timerSemaphore = xSemaphoreCreateBinary();
-//    hw_timer_t * timer = timerBegin(0, 80, true);
-//    timerAttachInterrupt(timer, &onTimer, true);
-//    timerAlarmWrite(timer, 1000000, true); //1sec notify
-//    timerAlarmEnable(timer);
-//
-//    //Initialize array
-//    for(int i=0;i<TXRX_BUF_LEN;i++){
-//        tx_buf[i] = 0;
-//    }
 }
 
 void loop() {
