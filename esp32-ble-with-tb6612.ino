@@ -9,6 +9,14 @@
 
 #include "esp_system.h"
 
+#include <Adafruit_NeoPixel.h>
+
+#define NEO_PIN 12
+#define NEO_NUM 12
+
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NEO_NUM, NEO_PIN, NEO_GRB + NEO_KHZ800);
+
+
 //------------------------------------------
 // TB6612 Moter Driver
 //------------------------------------------
@@ -29,6 +37,7 @@
 #define TB_B2    5  // moterB IN2
 #define TB_Bp   18  // moterB PWM
 #define TB_STBY  2  // STBY
+
 
 //Use LCDC for Servo Control
 // use first channel of 16 channels (started from zero)
@@ -189,10 +198,10 @@ void cmd_srv_off() {
 // BLE
 //------------------------------------------
 
-#define TXRX_BUF_LEN 5
 #define DEVICE_NAME  "YHD2017W-CP-ONI"
 #define SERVICE_UUID         "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
 #define CHARACTERISTIC_UUID  "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+#define CHARACTERISTIC2_UUID  "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
 /**************
 value kind            need time param?  description
@@ -216,7 +225,7 @@ value kind            need time param?  description
 #define CMD_SRV_ON     0x21
 #define CMD_SRV_OFF    0x22
 
-#define TURN_TIME 0x1080
+#define TURN_TIME 0x0E74
 
 uint8_t CMD_CURRENT = 0x00;
 
@@ -226,6 +235,7 @@ unsigned long start_time;
 
 //Characteristic
 BLECharacteristic *pCharacteristic;
+BLECharacteristic *pCharacteristic2;
 
 class MyCallbacks: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pChara) {
@@ -238,47 +248,88 @@ class MyCallbacks: public BLECharacteristicCallbacks {
             CMD_CURRENT = CMD_FORWARD;
             cmd_forward();
             start_time = millis();
-            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+            EXEC_TIME = ((int)value[2] << 8) + (int)value[1];
+            for(int i=0;i<NEO_NUM;i++){
+              pixels.setPixelColor(i, pixels.Color(150,0,0)); // Moderately bright green color.
+              delay(10);
+              pixels.show(); // This sends the updated pixel color to the hardware.
+            }
           }
         } else if ((int)value[0] == CMD_BACK){
           if(CMD_CURRENT != CMD_BACK){
             CMD_CURRENT = CMD_BACK;
             cmd_back();
             start_time = millis();
-            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+            EXEC_TIME = ((int)value[2] << 8) + (int)value[1];
+            for(int i=0;i<NEO_NUM;i++){
+              pixels.setPixelColor(i, pixels.Color(0,0,150)); // Moderately bright green color.
+              delay(10);
+              pixels.show(); // This sends the updated pixel color to the hardware.
+            }
           }
         } else if ((int)value[0] == CMD_STOP){
           if(CMD_CURRENT != CMD_STOP){
             CMD_CURRENT = CMD_STOP;
             cmd_stop();
             EXEC_TIME = 0;
+            for(int i=0;i<NEO_NUM;i++){
+              pixels.setPixelColor(i, pixels.Color(0,150,0)); // Moderately bright green color.
+              delay(10);
+              pixels.show(); // This sends the updated pixel color to the hardware.
+            }
           }
         } else if ((int)value[0] == CMD_SPIN_TURN){
           if(CMD_CURRENT != CMD_SPIN_TURN){
             CMD_CURRENT = CMD_SPIN_TURN;
             cmd_spin_turn();
             start_time = millis();
-//            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+//            EXEC_TIME = ((int)value[2] << 8) + (int)value[1];
               EXEC_TIME = TURN_TIME;
+            for(int i=0;i<NEO_NUM;i++){
+              pixels.setPixelColor(i, pixels.Color(150,0,0)); // Moderately bright green color.
+              delay(10);
+              pixels.show(); // This sends the updated pixel color to the hardware.
+            }
           }
         } else if ((int)value[0] == CMD_TURN_LEFT){
           if(CMD_CURRENT != CMD_TURN_LEFT){
             CMD_CURRENT = CMD_TURN_LEFT;
             cmd_turn_left();
             start_time = millis();
-            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+            EXEC_TIME = ((int)value[2] << 8) + (int)value[1];
+            for(int i=0;i<NEO_NUM;i++){
+              pixels.setPixelColor(i, pixels.Color(150,0,0)); // Moderately bright green color.
+              delay(10);
+              pixels.show(); // This sends the updated pixel color to the hardware.
+            }
           }
         } else if ((int)value[0] == CMD_TURN_RIGHT){
           if(CMD_CURRENT != CMD_TURN_RIGHT){
             CMD_CURRENT = CMD_TURN_RIGHT;
             cmd_turn_right();
             start_time = millis();
-            EXEC_TIME = (int)value[1] << 8 + (int)value[2];
+            EXEC_TIME = ((int)value[2] << 8) + (int)value[1];
+            for(int i=0;i<NEO_NUM;i++){
+              pixels.setPixelColor(i, pixels.Color(150,0,0)); // Moderately bright green color.
+              delay(10);
+              pixels.show(); // This sends the updated pixel color to the hardware.
+            }
           }
         } else if ((int)value[0] == CMD_SRV_ON){
           cmd_srv_on();
+          for(int i=0;i<NEO_NUM;i++){
+            pixels.setPixelColor(i, pixels.Color(0,150,0)); // Moderately bright green color.
+            delay(10);
+            pixels.show(); // This sends the updated pixel color to the hardware.
+          }
         } else if ((int)value[0] == CMD_SRV_OFF){
           cmd_srv_off();
+          for(int i=0;i<NEO_NUM;i++){
+            pixels.setPixelColor(i, pixels.Color(0,0,0)); // Moderately bright green color.
+            delay(10);
+            pixels.show(); // This sends the updated pixel color to the hardware.
+          }
+
         } else {
           Serial.println("*********");
           Serial.print("New value: ");
@@ -288,6 +339,8 @@ class MyCallbacks: public BLECharacteristicCallbacks {
           Serial.println();
           Serial.println("*********");
         }
+          Serial.println(EXEC_TIME);
+
       }
     }
 };
@@ -307,6 +360,13 @@ void setup_ble() {
     pCharacteristic->addDescriptor(new BLE2902());
     pCharacteristic->setCallbacks(new MyCallbacks());
     pCharacteristic->setValue("off");
+    
+    pCharacteristic2 = pService->createCharacteristic(
+                        CHARACTERISTIC2_UUID,
+                        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+                        );
+    pCharacteristic2->addDescriptor(new BLE2902());
+    pCharacteristic2->setValue("dmcd");
 
     // Start
     pService->start();
@@ -331,6 +391,11 @@ void IRAM_ATTR onTimer(){
     if(millis() > start_time + EXEC_TIME){
        CMD_CURRENT = CMD_STOP;
        cmd_stop();
+      for(int i=0;i<NEO_NUM;i++){
+        pixels.setPixelColor(i, pixels.Color(0,150,0)); // Moderately bright green color.
+        delay(10);
+        pixels.show(); // This sends the updated pixel color to the hardware.
+      }
        EXEC_TIME = 0;
     }
   }
@@ -340,6 +405,15 @@ void IRAM_ATTR onTimer(){
   xSemaphoreGiveFromISR(timerSemaphore, NULL);
   // It is safe to use digitalRead/Write here if you want to toggle an output
 }
+
+
+//------------------------------------------
+// Manual Control
+//------------------------------------------
+
+#define TXRX_BUF_LEN 5
+#define BTN_MANUAL  15  // ダルマさんが転んだマニュアルボタン
+uint8_t tx_buf[TXRX_BUF_LEN]; //DMSCD
 
 //------------------------------------------
 // Main logics
@@ -371,7 +445,18 @@ void setup() {
     timerAlarmWrite(timer, 1000, true);
     // Start an alarm
     timerAlarmEnable(timer);
+
+    pixels.begin(); // This initializes the NeoPixel library.
+    for(int i=0;i<NEO_NUM;i++){
+      pixels.setPixelColor(i, pixels.Color(0,0,0)); // Moderately bright green color.
+      delay(10);
+      pixels.show(); // This sends the updated pixel color to the hardware.
+    }
+
+    // ダルマさんが転んだマニュアルボタン
+    pinMode( BTN_MANUAL, INPUT );
 }
+
 
 void loop() {
 //  Serial.println(n);
@@ -379,4 +464,17 @@ void loop() {
 //  n+=5;
 //  if (n > max) n = min;
 //  delay(500);
+    if(digitalRead(BTN_MANUAL) == HIGH) {
+        Serial.println("BTN_MANUAL");
+        tx_buf[0] = 0x44;
+        tx_buf[1] = 0x4d;
+        tx_buf[2] = 0x53;
+        tx_buf[3] = 0x43;
+        tx_buf[4] = 0x44;
+        
+        //update notify
+        pCharacteristic2->setValue(tx_buf, TXRX_BUF_LEN); //send hex
+        pCharacteristic2->notify();
+        delay(500);
+    }
 }
