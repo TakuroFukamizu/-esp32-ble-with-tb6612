@@ -15,10 +15,14 @@
 - DEVICE_NAME : YHD2017W-CP-ONI
 - SERVICE_UUID : 6E400001-B5A3-F393-E0A9-E50E24DCCA9E
   - CHARACTERISTIC1_UUID : 6E400002-B5A3-F393-E0A9-E50E24DCCA9E
+  - CHARACTERISTIC2_UUID : 6E400003-B5A3-F393-E0A9-E50E24DCCA9E
 
 #### CHARACTERISTIC 1
 
+iOSアプリからロボットに動作を指示するIF  
+
 - PROPERTY : Read, Write without response
+- VALUE : mixed
 
 | start | size | name | kind | description | 
 |-------|-----|-----|-----|-----|
@@ -40,3 +44,13 @@
 | 0x21  | CMD_SRV_ON     | NO               | クラッピーを起こす | 
 | 0x22  | CMD_SRV_OFF    | NO               | クラッピーを倒す　 | 
 
+
+#### CHARACTERISTIC 2
+
+ロボットからiOSアプリに信号を伝えるIF  
+
+- PROPERTY : Read, Notify
+- VALUE : chars
+
+notifyされた時はロボット本体の「ダルマさんが転んだマニュアルボタン」が押された時。  
+この際、iOSアプリは内部のステータス管理を更新した後、`CHARACTERISTIC 1` でロボットに `CMD_SPIN_TURN` を指示する
