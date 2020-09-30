@@ -1,4 +1,8 @@
 // ESP32 Dev Module (ESPr Developer 32)
+// For Bluetooth Serial (SerialBT.println(temperatureString);)
+//SerialBT.begin("ESP32test"); //Bluetooth device name
+//#include<BluetoothSerial.h>
+
 
 #include <BLEDevice.h>
 #include <BLEServer.h>
